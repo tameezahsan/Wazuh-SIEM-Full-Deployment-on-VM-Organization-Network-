@@ -179,18 +179,26 @@ Provides:
 
 ## 🌍 VIRUSTOTAL INTEGRATION
 
-Integrate entity["organization","VirusTotal","malware analysis and threat intelligence platform"]
+Integrate entity ["organization","VirusTotal","malware analysis and threat intelligence platform"]
 
 Used for file hash enrichment and malware detection.
+```xml
+<integration>
+    <name>virustotal</name>
+    <api_key>YOUR_API_KEY</api_key>
+    <group>syscheck</group>
+    <alert_format>json</alert_format>
+  </integration>
+```
 
 ---
 
 ## 📁 FILE INTEGRITY MONITORING (FIM)
-
+This will monitor files at download location.
 ```xml
 <syscheck>
-  <directories check_all="yes">/home</directories>
-  <frequency>3600</frequency>
+  <directories check_all="yes" realtime="yes" report_changes="yes" recursion_level="0">C:\Windows</directories>
+  <directories check_all="yes" realtime="yes" report_changes="yes">C:\Users\*\Downloads</directories>
 </syscheck>
 ```
 
