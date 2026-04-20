@@ -128,8 +128,8 @@ ip a
 ### Windows Agent
 
 ```powershell
-msiexec /i wazuh-agent.msi /q WAZUH_MANAGER="150.1.7.158"
-Start-Service wazuh
+Sysmon.exe -accepteula -i .\sysmonconfig-export.xml
+Sysmon64.exe -c
 ```
 
 ### Linux Agent
@@ -158,7 +158,7 @@ On Wazuh VM:
 
 ## 🧠 SYSMON INTEGRATION
 
-Install entity["software","Sysmon","Microsoft Sysinternals system monitoring tool"]
+Install entity ["software","Sysmon","Microsoft Sysinternals system monitoring tool"]
 
 Enable logging:
 
@@ -247,7 +247,3 @@ MIT License
 Open an issue in this repository for support.
 
 ---
-
-## 📬 Contact
-
-For support, open an issue in this repository.
