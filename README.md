@@ -2,20 +2,22 @@
 
 ## 📌 Overview
 
-This repository provides a complete guide for deploying a **Wazuh Security Information and Event Management (SIEM) platform on a Virtual Machine (VM)** inside an organization network. It includes server installation, endpoint integration, Sysmon configuration, and VirusTotal threat intelligence integration.
+This repository provides a complete, production-ready guide for deploying a **Wazuh SIEM platform on a Virtual Machine (VM) using the official Wazuh 4.14.3 OVA image** inside an organization network.
 
-This setup is designed for enterprise SOC environments where centralized monitoring and endpoint visibility are required.
+It includes VM network configuration, endpoint integration, Sysmon telemetry, and VirusTotal threat intelligence enrichment.
+
+This setup is designed for enterprise SOC environments requiring centralized monitoring, endpoint visibility, and secure internal network segmentation.
 
 ---
 
 ## 🎯 Objectives
 
-* Deploy Wazuh SIEM on a dedicated VM
-* Centralize security monitoring for organization endpoints
-* Integrate Windows and Linux agents
-* Enable Sysmon-based deep endpoint visibility
+* Deploy Wazuh SIEM on a VM using official OVA image
+* Configure secure dual-network VM (NAT + Host-only)
+* Integrate Windows and Linux endpoint agents
+* Enable Sysmon-based deep endpoint monitoring
 * Integrate VirusTotal for threat intelligence enrichment
-* Ensure secure internal network communication
+* Maintain secure internal SOC communication
 
 ---
 
@@ -28,7 +30,7 @@ Endpoints (Windows/Linux)
    Wazuh Agent
         │
         ▼
- Wazuh VM Server (Manager + Indexer + Dashboard)
+ Wazuh VM Server (OVA: Manager + Indexer + Dashboard)
         │
         ├── Log Analysis Engine
         ├── Sysmon Event Processing
@@ -40,113 +42,97 @@ Endpoints (Windows/Linux)
 
 ---
 
-## 🖥️ VM Requirements
+## 🖥️ OVA DEPLOYMENT (WAZUH SERVER)
 
-### Recommended Specifications
+The Wazuh server is deployed using the **official Wazuh 4.14.3 OVA image**, which comes preconfigured with all required components.
 
-* CPU: 4–8 vCPU
-* RAM: 8–16 GB (32 GB recommended for production)
-* Storage: 100–500 GB SSD
-* OS: Ubuntu 22.04 LTS
-* Static IP: Required (e.g., 192.168.1.10)
+### Deployment Steps
 
----
+1. Import the Wazuh 4.14.3 OVA image into VMware/VirtualBox
+2. Allocate resources:
 
-## 🌐 Network Configuration
+   * CPU: 4–8 cores
+   * RAM: 8–16 GB
+   * Storage: 100+ GB
+3. Configure network adapters:
 
-### Required Ports
-
-| Port  | Protocol | Purpose             |
-| ----- | -------- | ------------------- |
-| 1514  | TCP      | Agent communication |
-| 1515  | TCP      | Agent enrollment    |
-| 55000 | TCP      | Wazuh API           |
-| 443   | HTTPS    | Dashboard           |
-
-### Firewall Rule Example
-
-```bash
-sudo ufw allow 1514/tcp
-sudo ufw allow 1515/tcp
-sudo ufw allow 55000/tcp
-sudo ufw allow 443/tcp
-sudo ufw enable
-```
+   * Adapter 1 → NAT (Internet access)
+   * Adapter 2 → Host-Only (VMnet1 internal SOC network)
+4. Start the VM
 
 ---
 
-## ⚙️ Wazuh Server Installation (VM)
+## 🌐 VM NETWORK CONFIGURATION
 
-### Step 1: Update System
+The VM uses a dual-network design:
 
-```bash
-sudo apt update && sudo apt upgrade -y
-```
-
-### Step 2: Download Installer
-
-```bash
-curl -sO https://packages.wazuh.com/4.7/wazuh-install.sh
-chmod +x wazuh-install.sh
-```
-
-### Step 3: Install Full Stack
-
-```bash
-sudo ./wazuh-install.sh -a
-```
-
-This installs:
-
-* Wazuh Manager
-* Wazuh Indexer
-* Wazuh Dashboard
+| Adapter   | Type               | Purpose                             |
+| --------- | ------------------ | ----------------------------------- |
+| Adapter 1 | NAT                | Internet access (updates, packages) |
+| Adapter 2 | Host-Only (VMnet1) | Internal SOC network                |
 
 ---
 
-## 🌍 Access Wazuh Dashboard
-
-Open browser:
-
-```
-https://<VM_IP>
-```
-
-Login credentials are generated during installation.
-
----
-
-## 🔐 Wazuh Server Configuration
-
-Edit configuration file:
+### Network Setup Steps
 
 ```bash
-sudo nano /var/ossec/etc/ossec.conf
+sudo su
 ```
 
-### Allow Organization Network
+Configure NAT interface:
 
-```xml
-<remote>
-  <connection>secure</connection>
-  <port>1514</port>
-  <protocol>tcp</protocol>
-  <allowed-ips>192.168.0.0/16</allowed-ips>
-</remote>
+```bash
+nano /etc/systemd/network/20-eth0.network
+```
+
+```
+[Match]
+Name=eth0
+
+[Network]
+DHCP=yes
+```
+
+Configure internal interface:
+
+```bash
+nano /etc/systemd/network/30-eth1.network
+```
+
+```
+[Match]
+Name=eth1
+
+[Network]
+Address=150.1.7.158/24
+```
+
+Apply configuration:
+
+```bash
+ip addr flush dev eth1
+systemctl restart systemd-networkd
+```
+
+Verify:
+
+```bash
+networkctl list
+ip a
 ```
 
 ---
 
-## 💻 Endpoint Deployment
+## 💻 ENDPOINT DEPLOYMENT
 
-### 🪟 Windows Agent
+### Windows Agent
 
 ```powershell
-msiexec /i wazuh-agent.msi /q WAZUH_MANAGER="192.168.1.10"
+msiexec /i wazuh-agent.msi /q WAZUH_MANAGER="150.1.7.158"
 Start-Service wazuh
 ```
 
-### 🐧 Linux Agent
+### Linux Agent
 
 ```bash
 sudo apt install wazuh-agent
@@ -156,7 +142,7 @@ sudo systemctl start wazuh-agent
 
 ---
 
-## 🔑 Agent Registration (Static Mode)
+## 🔑 AGENT REGISTRATION
 
 On Wazuh VM:
 
@@ -164,29 +150,17 @@ On Wazuh VM:
 /var/ossec/bin/manage_agents
 ```
 
-Steps:
-
-1. Add agent
-2. Generate key
-3. Copy key
-
-On endpoint:
-
-* Paste key into agent manager
+* Add agent
+* Generate key
+* Copy key to endpoint
 
 ---
 
-## 🧠 Sysmon Integration (Windows)
+## 🧠 SYSMON INTEGRATION
 
 Install entity["software","Sysmon","Microsoft Sysinternals system monitoring tool"]
 
-### Install Sysmon
-
-```powershell
-sysmon64.exe -i sysmonconfig.xml
-```
-
-### Enable in Wazuh Agent
+Enable logging:
 
 ```xml
 <localfile>
@@ -195,38 +169,23 @@ sysmon64.exe -i sysmonconfig.xml
 </localfile>
 ```
 
-Sysmon provides:
+Provides:
 
 * Process monitoring
-* Network connection tracking
-* Registry and file changes
+* Network tracking
+* File and registry changes
 
 ---
 
-## 🌍 VirusTotal Integration
+## 🌍 VIRUSTOTAL INTEGRATION
 
 Integrate entity["organization","VirusTotal","malware analysis and threat intelligence platform"]
 
-### Configuration
-
-```xml
-<integration>
-  <name>virustotal</name>
-  <api_key>YOUR_API_KEY</api_key>
-  <group>syscheck</group>
-  <alert_format>json</alert_format>
-</integration>
-```
-
-Features:
-
-* File hash analysis
-* Malware detection enrichment
-* Threat intelligence correlation
+Used for file hash enrichment and malware detection.
 
 ---
 
-## 📁 File Integrity Monitoring (FIM)
+## 📁 FILE INTEGRITY MONITORING (FIM)
 
 ```xml
 <syscheck>
@@ -237,55 +196,47 @@ Features:
 
 ---
 
-## 📊 Verification
-
-### Check Active Agents
+## 📊 VERIFICATION
 
 ```bash
 /var/ossec/bin/agent_control -l
-```
-
-### Check Logs
-
-```bash
 tail -f /var/ossec/logs/ossec.log
 ```
 
-### Dashboard Checks
+---
 
-* Active agents connected
-* Security alerts generating
-* Sysmon logs visible
-* VirusTotal alerts working
+## 🔐 SECURITY BEST PRACTICES
+
+* Use static IP for VM (eth1)
+* Keep SOC network isolated
+* Restrict dashboard access
+* Secure agent keys
+* Enable TLS communication
+* Monitor VM resources
 
 ---
 
-## 🔐 Security Best Practices
+## 🚀 FINAL OUTCOME
 
-* Use static IP for VM
-* Restrict dashboard access to IT team
-* Enable TLS encryption for agents
-* Regularly update Wazuh and Sysmon
-* Secure API keys
-* Monitor VM resource usage
+This deployment provides a complete SOC monitoring solution:
 
----
-
-## 🚀 Final Outcome
-
-After deployment, the organization achieves:
-
-* Centralized SIEM monitoring system
+* Centralized SIEM platform
 * Real-time endpoint visibility
-* Advanced Windows telemetry (Sysmon)
-* Threat intelligence enrichment (VirusTotal)
-* Secure and scalable SOC architecture inside VM infrastructure
+* Sysmon deep telemetry
+* VirusTotal threat intelligence enrichment
+* Secure organization network architecture
 
 ---
 
-## 📄 License
+## 📄 LICENSE
 
 MIT License
+
+---
+
+## 📬 CONTACT
+
+Open an issue in this repository for support.
 
 ---
 
