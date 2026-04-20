@@ -205,6 +205,7 @@ This will monitor files at download location.
 ---
 
 ## 📊 VERIFICATION
+All above intregration is done in agent configuration file to run properly on end-devices after deploying.
 
 ```bash
 /var/ossec/bin/agent_control -l
